@@ -1,0 +1,535 @@
+// Axiom Finance - Comprehensive Financial Planning Database Schema
+// Supports: Personal Finance, AI Analysis, DeFAI Trading Agents
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// NEXTAUTH MODELS (Required for Authentication)
+// ============================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+ 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  @@unique([provider, providerAccountId])
+}
+ 
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+ 
+  @@unique([identifier, token])
+}
+
+// ============================================
+// USER & SETTINGS
+// ============================================
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // NextAuth relations
+  accounts      Account[]
+  sessions      Session[]
+  
+  // Plaid relations
+  plaidItems    PlaidItem[]
+  
+  settings      UserSettings?
+  transactions  Transaction[]
+  budgets       Budget[]
+  categories    Category[]
+  chatSessions  ChatSession[]
+  reports       AnalysisReport[]
+  trades        Trade[]
+}
+
+model UserSettings {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // AI Model Configuration - Primary (Conversational)
+  primaryModelProvider  String?  // "openrouter", "openai", "anthropic", "google", "custom"
+  primaryModelName      String?  // e.g., "xiaomi/mimo-v2-flash", "gpt-4o-mini"
+  primaryApiKey         String?  // Encrypted API key
+  
+  // AI Model Configuration - Reasoning (Deep Analysis)
+  reasoningModelProvider String?
+  reasoningModelName    String?
+  reasoningApiKey       String?
+  
+  // AI Model Configuration - Document Reader
+  docReaderModelProvider String?
+  docReaderModelName    String?
+  docReaderApiKey       String?
+  
+  // OpenRouter Configuration
+  openRouterApiKey      String?
+  
+  // DeFAI Trading Models
+  tradingModelProvider  String?
+  tradingModelName      String?
+  tradingApiKey         String?
+  
+  // App Preferences
+  defaultDateRange      String   @default("90d") // 30d, 90d, 180d, 1y, all
+  currency              String   @default("USD")
+  privacyMode           Boolean  @default(false) // Disables AI features
+  darkMode              Boolean  @default(true)
+  
+  // DeFAI Trading Settings
+  tradingEnabled        Boolean  @default(false)
+  paperTradingMode      Boolean  @default(true) // Simulation mode
+  startingCapital       Float    @default(1000)
+  maxGasPriceGwei       Float    @default(50)
+  slippageTolerance     Float    @default(0.5)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// ============================================
+// TRANSACTIONS & FINANCIAL DATA
+// ============================================
+
+model Transaction {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Core transaction data
+  transactionDate DateTime
+  clearingDate    DateTime?
+  description     String
+  merchant        String?
+  category        String?
+  type            String   // Purchase, Payment, Interest, Transfer, Refund
+  amount          Float
+  currency        String   @default("USD")
+  
+  // Source tracking
+  source          String   @default("manual") // apple-card, bank-statement, manual
+  sourceFile      String?  // Original filename if imported
+  
+  // User-editable fields
+  userCategory    String?  // User override for category
+  tags            String?  // Comma-separated tags
+  notes           String?
+  
+  // AI-enhanced fields
+  aiCategory      String?  // AI-suggested category
+  aiConfidence    Float?   // Confidence score 0-1
+  
+  // Metadata
+  isRecurring     Boolean  @default(false)
+  recurringId     String?  // Link to subscription detection
+  
+  // Deduplication
+  externalId      String?  @unique // Hash for deduplication
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([userId, transactionDate])
+  @@index([userId, category])
+  @@index([userId, merchant])
+  @@index([userId, type])
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name        String
+  icon        String?
+  color       String?
+  budgetLimit Float?
+  isSystem    Boolean  @default(false) // Pre-defined categories
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([userId, name])
+}
+
+model Budget {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  category    String
+  amount      Float
+  period      String   @default("monthly") // weekly, monthly, yearly
+  startDate   DateTime @default(now())
+  endDate     DateTime?
+  isActive    Boolean  @default(true)
+  
+  // AI suggestions
+  aiSuggested Boolean  @default(false)
+  aiReasoning String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId, period])
+}
+
+model Subscription {
+  id              String   @id @default(cuid())
+  userId          String
+  
+  merchant        String
+  estimatedAmount Float
+  lastAmount      Float?
+  frequency       String   @default("monthly") // weekly, monthly, yearly
+  lastCharged     DateTime?
+  nextExpected    DateTime?
+  occurrences     Int      @default(0)
+  
+  // User actions
+  status          String   @default("active") // active, review, cancelled, keep
+  
+  // AI insights
+  aiComment       String?
+  monthsActive    Int?
+  totalSpent      Float?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([userId, status])
+}
+
+// ============================================
+// AI CHAT & ANALYSIS
+// ============================================
+
+model ChatSession {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title       String?
+  modelUsed   String?
+  isActive    Boolean  @default(true)
+  
+  messages    ChatMessage[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId, createdAt])
+}
+
+model ChatMessage {
+  id          String      @id @default(cuid())
+  sessionId   String
+  session     ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  role        String      // user, assistant, system
+  content     String
+  
+  // Context injected (for audit/debug)
+  contextSize Int?        // Number of transactions injected
+  
+  // Token usage
+  inputTokens Int?
+  outputTokens Int?
+  modelUsed   String?
+  
+  createdAt   DateTime    @default(now())
+  
+  @@index([sessionId, createdAt])
+}
+
+model AnalysisReport {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  reportType      String   // subscription-audit, interest-analysis, anomaly-detection, savings-opportunities, full-analysis
+  title           String
+  summary         String
+  
+  // Detailed findings (JSON structure)
+  findings        String   // JSON string
+  
+  // Model info
+  modelUsed       String?
+  analysisDate    DateTime @default(now())
+  
+  // Date range analyzed
+  dateRangeStart  DateTime?
+  dateRangeEnd    DateTime?
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([userId, reportType])
+}
+
+// ============================================
+// DeFAI TRADING AGENTS
+// ============================================
+
+model TradingAgent {
+  id              String   @id @default(cuid())
+  userId          String
+  
+  name            String
+  agentType       String   // signal, execution, simulation, competitor-tracker
+  modelProvider   String?
+  modelName       String?
+  
+  status          String   @default("idle") // idle, running, paused, error
+  lastActivity    DateTime?
+  
+  // Performance
+  totalTrades     Int      @default(0)
+  winRate         Float    @default(0)
+  totalProfit     Float    @default(0)
+  totalLoss       Float    @default(0)
+  
+  config          String?  // JSON config
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Trade {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentId         String?
+  
+  // Trade details
+  tokenPair       String   // e.g., "SOL/USDC"
+  tradeType       String   // arbitrage, flash-loan, swap
+  direction       String   // buy, sell
+  
+  // Amounts
+  amountIn        Float
+  amountOut       Float?
+  profitUsd       Float?
+  
+  // Execution
+  sourceDex       String?
+  targetDex       String?
+  gasUsed         Float?
+  gasPriceGwei    Float?
+  
+  // Status
+  status          String   @default("pending") // pending, executed, failed, simulated
+  txHash          String?
+  
+  // Simulation mode
+  isSimulation    Boolean  @default(true)
+  simulationReason String?
+  
+  // AI decision
+  modelUsed       String?
+  confidence      Float?
+  reasoning       String?
+  
+  executedAt      DateTime?
+  createdAt       DateTime @default(now())
+  
+  @@index([userId, status])
+  @@index([userId, createdAt])
+}
+
+model CompetitorBot {
+  id              String   @id @default(cuid())
+  
+  botAddress      String   @unique
+  contractAddress String?
+  chainId         Int      @default(137) // Polygon default
+  
+  // Tracking
+  totalWins       Int      @default(0)
+  totalProfitUsd  Float    @default(0)
+  avgProfitPerTrade Float?
+  
+  // Patterns
+  preferredPairs  String?  // Comma-separated
+  activeHours     String?  // JSON array of hours
+  
+  firstSeen       DateTime @default(now())
+  lastActive      DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model MarketState {
+  id              String   @id @default(cuid())
+  
+  chainId         Int      @default(137)
+  tokenPair       String
+  
+  // Prices
+  uniswapPrice    Float?
+  sushiswapPrice  Float?
+  quickswapPrice  Float?
+  
+  // Spread
+  maxSpreadPercent Float?
+  spreadDirection  String?
+  
+  // Conditions
+  gasPriceGwei    Float?
+  ethPriceUsd     Float?
+  
+  blockNumber     Int?
+  recordedAt      DateTime @default(now())
+  
+  @@index([tokenPair, recordedAt])
+}
+
+model TradingExperience {
+  id              String   @id @default(cuid())
+  
+  // RL Training data
+  stateVector     String   // JSON
+  actionType      String   // buy, sell, hold, flash-loan
+  actionParams    String?  // JSON
+  
+  reward          Float
+  profitUsd       Float?
+  
+  nextStateVector String?  // JSON
+  wasSuccessful   Boolean  @default(false)
+  
+  // Metadata
+  strategyUsed    String?
+  failureReason   String?
+  
+  // Priority for PER (Prioritized Experience Replay)
+  priorityScore   Float    @default(0.001)
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([priorityScore])
+}
+
+// ============================================
+// FILE IMPORTS & PROCESSING
+// ============================================
+
+model FileImport {
+  id              String   @id @default(cuid())
+  userId          String
+  
+  filename        String
+  fileSize        Int
+  fileType        String   // csv, pdf
+  
+  status          String   @default("pending") // pending, processing, completed, failed
+  recordsTotal    Int?
+  recordsImported Int?
+  recordsSkipped  Int?     // Duplicates
+  
+  errorMessage    String?
+  
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+}
+
+// ============================================
+// PLAID BANK CONNECTIONS
+// ============================================
+
+model PlaidItem {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Plaid identifiers
+  itemId          String   @unique  // Plaid's item_id
+  accessToken     String   // Encrypted access token
+  refreshToken    String?  // For token refresh
+  institutionId   String?  // Plaid institution ID
+  institutionName String?
+  
+  // Status
+  status          String   @default("active") // active, error, disconnected
+  statusLastCheck DateTime?
+  
+  // Cursor for syncing
+  cursor          String?  // Plaid cursor for pagination
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  accounts        LinkedAccount[]
+  
+  @@index([userId])
+}
+
+model LinkedAccount {
+  id              String   @id @default(cuid())
+  plaidItemId     String
+  plaidItem       PlaidItem @relation(fields: [plaidItemId], references: [id], onDelete: Cascade)
+  
+  // Plaid identifiers
+  accountId       String   @unique  // Plaid's account_id
+  plaidAccountType String?
+  plaidSubtype    String?
+  
+  // Display info
+  name            String
+  officialName    String?
+  mask           String?  // Last 4 digits
+  
+  // Balance (cached)
+  currentBalance  Float?
+  availableBalance Float?
+  currency        String   @default("USD")
+  lastUpdated     DateTime?
+  
+  // Status
+  status          String   @default("active")
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([plaidItemId])
+}
