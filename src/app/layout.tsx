@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { Providers } from "@/components/Providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,21 +16,9 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Axiom Finance - AI-Powered Financial Intelligence",
-  description: "Personal AI-powered financial planning and DeFAI trading agents. Manage budgets, analyze spending, and automate DeFi trading strategies.",
-  keywords: ["Axiom Finance", "AI Finance", "Personal Finance", "DeFAI", "DeFi Trading", "Budget Planning", "Financial AI"],
-  authors: [{ name: "Axiom Finance Team" }],
+  description: "Personal AI-powered financial planning and DeFAI trading agents.",
   icons: {
     icon: "/logo.svg",
-  },
-  openGraph: {
-    title: "Axiom Finance",
-    description: "AI-Powered Financial Intelligence",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Axiom Finance",
-    description: "AI-Powered Financial Intelligence",
   },
 };
 
@@ -43,8 +32,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
-        {children}
-        <Toaster />
+        <Providers>
+          {children}
+          <Toaster />
+        </Providers>
       </body>
     </html>
   );

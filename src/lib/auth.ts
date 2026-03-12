@@ -7,31 +7,31 @@ import CredentialsProvider from 'next-auth/providers/credentials';
  * NextAuth Configuration for Axiom Finance
  * 
  * Supports:
- * - Google OAuth
- * - Apple OAuth  
- * - Email/Password (credentials)
+ * - Google OAuth (if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set)
+ * - Apple OAuth (if APPLE credentials are set)
+ * - Email/Password (credentials) - always available for demo
  */
 
 export const authOptions: NextAuthOptions = {
-  // Use JWT strategy (no database required for demo mode)
-  // In production, add PrismaAdapter(db) when using a real database
-  
-  // Configure authentication providers
+  // Configure authentication providers dynamically
   providers: [
-    // Google OAuth
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-    }),
+    // Google OAuth - Only enable if credentials are provided
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+      ? [GoogleProvider({
+          clientId: process.env.GOOGLE_CLIENT_ID,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        })]
+      : []),
     
-    // Apple OAuth
-    AppleProvider({
-      clientId: process.env.APPLE_ID || '',
-      clientSecret: process.env.APPLE_TEAM_ID + ',' + process.env.APPLE_KEY_ID + ',' + process.env.APPLE_PRIVATE_KEY || '',
-    }),
+    // Apple OAuth - Only enable if credentials are provided  
+    ...(process.env.APPLE_ID && process.env.APPLE_PRIVATE_KEY
+      ? [AppleProvider({
+          clientId: process.env.APPLE_ID,
+          clientSecret: `${process.env.APPLE_TEAM_ID},${process.env.APPLE_KEY_ID},${process.env.APPLE_PRIVATE_KEY}`,
+        })]
+      : []),
     
-    // Email/Password fallback (for demo/development)
-    // In production, use a proper auth library or implement secure password hashing
+    // Email/Password fallback - Always available for demo
     CredentialsProvider({
       name: 'Demo Account',
       credentials: {
@@ -40,9 +40,7 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         // Demo mode: accept any email/password combination
-        // In production, implement proper password verification
         if (credentials?.email && credentials?.password) {
-          // Return user object - in production, verify password hash
           return {
             id: 'demo-' + credentials.email,
             email: credentials.email,
@@ -52,7 +50,7 @@ export const authOptions: NextAuthOptions = {
         return null;
       }
     }),
-  ],
+  ].filter(Boolean) as any,
   
   // Session configuration
   session: {
@@ -68,7 +66,6 @@ export const authOptions: NextAuthOptions = {
   
   // Callbacks
   callbacks: {
-    // Add user ID to session
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
@@ -76,7 +73,6 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     
-    // Add user ID to session object
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
@@ -84,21 +80,16 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     
-    // Handle new user sign-up
     async signIn({ user, account }) {
-      // Allow sign in
       return true;
     },
   },
   
-  // Events
   events: {
     async createUser({ user }) {
-      // User created via OAuth - could send welcome email here
       console.log('New user created:', user.email);
     },
   },
   
-  // Debug mode (disable in production)
   debug: process.env.NODE_ENV === 'development',
 };

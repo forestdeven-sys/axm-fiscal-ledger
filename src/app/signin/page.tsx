@@ -1,6 +1,6 @@
 'use client';
 
-import { signIn } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -8,30 +8,28 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { 
-  Chrome, 
-  Apple, 
   Mail, 
   Loader2, 
   Lock,
-  TrendingUp,
-  AlertCircle
+  TrendingUp
 } from 'lucide-react';
 
 export default function SignInPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [isLoading, setIsLoading] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
 
-  // Check if OAuth is configured
-  const isOAuthConfigured = process.env.NEXT_PUBLIC_OAUTH_GOOGLE === 'true' || 
-                            process.env.NEXT_PUBLIC_OAUTH_APPLE === 'true';
+  // Redirect if already signed in
+  if (session) {
+    router.push('/');
+    return null;
+  }
 
   const handleDemoSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading('demo');
-    setError(null);
     
     const result = await signIn('credentials', {
       email,
@@ -42,19 +40,6 @@ export default function SignInPage() {
     if (result?.ok) {
       router.push('/');
     } else {
-      setError('Invalid credentials. Please try again.');
-      setIsLoading(null);
-    }
-  };
-
-  const handleOAuthSignIn = async (provider: string) => {
-    setIsLoading(provider);
-    setError(null);
-    try {
-      await signIn(provider, { callbackUrl: '/' });
-    } catch (error) {
-      console.error('Sign in error:', error);
-      setError('OAuth sign-in is not configured. Please use email/password.');
       setIsLoading(null);
     }
   };
@@ -83,14 +68,6 @@ export default function SignInPage() {
         </CardHeader>
         
         <CardContent className="space-y-6">
-          {/* Error message */}
-          {error && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-              <AlertCircle className="h-4 w-4" />
-              {error}
-            </div>
-          )}
-
           {/* Demo/Email Sign In - Always Available */}
           <form onSubmit={handleDemoSignIn} className="space-y-4">
             <div className="space-y-2">
@@ -134,7 +111,7 @@ export default function SignInPage() {
                   Signing in...
                 </>
               ) : (
-                'Sign In with Email'
+                'Sign In'
               )}
             </Button>
             
@@ -149,36 +126,35 @@ export default function SignInPage() {
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">
-                Or continue with
+                Quick Demo
               </span>
             </div>
           </div>
 
-          {/* OAuth Providers - Show as disabled/educational */}
-          <div className="space-y-3">
+          {/* Quick demo buttons */}
+          <div className="grid grid-cols-2 gap-3">
             <Button
               variant="outline"
-              className="w-full h-12 opacity-50 cursor-not-allowed"
-              disabled
+              className="h-10"
+              onClick={() => {
+                setEmail('demo@axiom.finance');
+                setPassword('demo123');
+              }}
+              disabled={!!isLoading}
             >
-              <Chrome className="h-5 w-5 mr-2" />
-              Google OAuth (Coming Soon)
+              Load Demo User
             </Button>
-            
             <Button
               variant="outline"
-              className="w-full h-12 opacity-50 cursor-not-allowed"
-              disabled
+              className="h-10"
+              onClick={() => {
+                setEmail('admin@axiom.finance');
+                setPassword('admin123');
+              }}
+              disabled={!!isLoading}
             >
-              <Apple className="h-5 w-5 mr-2" />
-              Apple OAuth (Coming Soon)
+              Load Admin
             </Button>
-            
-            <p className="text-xs text-center text-muted-foreground mt-4">
-              OAuth requires Google Cloud / Apple Developer setup.
-              <br />
-              Add credentials to enable.
-            </p>
           </div>
         </CardContent>
       </Card>
