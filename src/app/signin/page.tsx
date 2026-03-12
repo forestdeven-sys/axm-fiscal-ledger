@@ -13,7 +13,8 @@ import {
   Mail, 
   Loader2, 
   Lock,
-  TrendingUp
+  TrendingUp,
+  AlertCircle
 } from 'lucide-react';
 
 export default function SignInPage() {
@@ -21,20 +22,16 @@ export default function SignInPage() {
   const [isLoading, setIsLoading] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
-  const handleOAuthSignIn = async (provider: string) => {
-    setIsLoading(provider);
-    try {
-      await signIn(provider, { callbackUrl: '/' });
-    } catch (error) {
-      console.error('Sign in error:', error);
-      setIsLoading(null);
-    }
-  };
+  // Check if OAuth is configured
+  const isOAuthConfigured = process.env.NEXT_PUBLIC_OAUTH_GOOGLE === 'true' || 
+                            process.env.NEXT_PUBLIC_OAUTH_APPLE === 'true';
 
   const handleDemoSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading('demo');
+    setError(null);
     
     const result = await signIn('credentials', {
       email,
@@ -45,6 +42,19 @@ export default function SignInPage() {
     if (result?.ok) {
       router.push('/');
     } else {
+      setError('Invalid credentials. Please try again.');
+      setIsLoading(null);
+    }
+  };
+
+  const handleOAuthSignIn = async (provider: string) => {
+    setIsLoading(provider);
+    setError(null);
+    try {
+      await signIn(provider, { callbackUrl: '/' });
+    } catch (error) {
+      console.error('Sign in error:', error);
+      setError('OAuth sign-in is not configured. Please use email/password.');
       setIsLoading(null);
     }
   };
@@ -54,16 +64,16 @@ export default function SignInPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       {/* Background effects */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-axiom-primary/10 via-background to-background" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500/10 via-background to-background" />
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
       
       <Card className="w-full max-w-md relative z-10 border-border/50 bg-background/80 backdrop-blur-xl">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto h-14 w-14 rounded-xl bg-gradient-to-br from-axiom-primary to-axiom-secondary flex items-center justify-center">
+          <div className="mx-auto h-14 w-14 rounded-xl bg-gradient-to-br from-cyan-500 to-green-500 flex items-center justify-center">
             <TrendingUp className="h-7 w-7 text-background" />
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold text-gradient">
+            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-green-400 bg-clip-text text-transparent">
               Axiom Finance
             </CardTitle>
             <CardDescription className="mt-2">
@@ -73,53 +83,15 @@ export default function SignInPage() {
         </CardHeader>
         
         <CardContent className="space-y-6">
-          {/* OAuth Providers */}
-          <div className="space-y-3">
-            <Button
-              variant="outline"
-              className="w-full h-12 relative"
-              onClick={() => handleOAuthSignIn('google')}
-              disabled={!!isLoading}
-            >
-              {isLoading === 'google' ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <>
-                  <Chrome className="h-5 w-5 mr-2" />
-                  Continue with Google
-                </>
-              )}
-            </Button>
-            
-            <Button
-              variant="outline"
-              className="w-full h-12"
-              onClick={() => handleOAuthSignIn('apple')}
-              disabled={!!isLoading}
-            >
-              {isLoading === 'apple' ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <>
-                  <Apple className="h-5 w-5 mr-2" />
-                  Continue with Apple
-                </>
-              )}
-            </Button>
-          </div>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <Separator className="w-full" />
+          {/* Error message */}
+          {error && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+              <AlertCircle className="h-4 w-4" />
+              {error}
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with email
-              </span>
-            </div>
-          </div>
+          )}
 
-          {/* Demo/Email Sign In */}
+          {/* Demo/Email Sign In - Always Available */}
           <form onSubmit={handleDemoSignIn} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Email</label>
@@ -153,7 +125,7 @@ export default function SignInPage() {
 
             <Button
               type="submit"
-              className="w-full h-11"
+              className="w-full h-11 bg-gradient-to-r from-cyan-500 to-green-500 hover:from-cyan-400 hover:to-green-400"
               disabled={!isDemoConfigured || !!isLoading}
             >
               {isLoading === 'demo' ? (
@@ -162,7 +134,7 @@ export default function SignInPage() {
                   Signing in...
                 </>
               ) : (
-                'Sign In'
+                'Sign In with Email'
               )}
             </Button>
             
@@ -170,6 +142,44 @@ export default function SignInPage() {
               Demo mode: Enter any email/password to sign in
             </p>
           </form>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <Separator className="w-full" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">
+                Or continue with
+              </span>
+            </div>
+          </div>
+
+          {/* OAuth Providers - Show as disabled/educational */}
+          <div className="space-y-3">
+            <Button
+              variant="outline"
+              className="w-full h-12 opacity-50 cursor-not-allowed"
+              disabled
+            >
+              <Chrome className="h-5 w-5 mr-2" />
+              Google OAuth (Coming Soon)
+            </Button>
+            
+            <Button
+              variant="outline"
+              className="w-full h-12 opacity-50 cursor-not-allowed"
+              disabled
+            >
+              <Apple className="h-5 w-5 mr-2" />
+              Apple OAuth (Coming Soon)
+            </Button>
+            
+            <p className="text-xs text-center text-muted-foreground mt-4">
+              OAuth requires Google Cloud / Apple Developer setup.
+              <br />
+              Add credentials to enable.
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
