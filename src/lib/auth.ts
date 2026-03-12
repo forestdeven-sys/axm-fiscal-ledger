@@ -2,8 +2,6 @@ import { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import AppleProvider from 'next-auth/providers/apple';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { PrismaAdapter } from '@auth/prisma-adapter';
-import { db } from './db';
 
 /**
  * NextAuth Configuration for Axiom Finance
@@ -15,8 +13,8 @@ import { db } from './db';
  */
 
 export const authOptions: NextAuthOptions = {
-  // Use Prisma adapter for database session/user storage
-  adapter: PrismaAdapter(db) as any,
+  // Use JWT strategy (no database required for demo mode)
+  // In production, add PrismaAdapter(db) when using a real database
   
   // Configure authentication providers
   providers: [
@@ -64,8 +62,8 @@ export const authOptions: NextAuthOptions = {
   
   // Pages
   pages: {
-    signIn: '/api/auth/signin',
-    error: '/api/auth/error',
+    signIn: '/signin',
+    error: '/signin',
   },
   
   // Callbacks
