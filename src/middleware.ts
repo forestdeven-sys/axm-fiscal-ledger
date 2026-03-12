@@ -15,7 +15,7 @@ export default withAuth({
 });
 
 export const config = {
-  // Protect all routes except static files, auth, and public assets
+  // Protect all routes except static files, auth, signin, and public assets
   matcher: [
     /*
      * Match all request paths except:
@@ -24,6 +24,7 @@ export const config = {
      * - favicon.ico (favicon)
      * - public folder
      * - auth endpoints (/api/auth/*)
+     * - signin page
      */
     '/((?!_next/static|_next/image|favicon.ico|public|api/auth|signin).*)',
   ],
