@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useAppStore } from '@/store';
+import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { useRouter, usePathname } from 'next/navigation';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { Dashboard } from '@/components/finance/Dashboard';
 import { TransactionsTable } from '@/components/finance/TransactionsTable';
@@ -15,20 +16,52 @@ import { GoalsTracker } from '@/components/finance/GoalsTracker';
 import { CreditScoreTracker } from '@/components/finance/CreditScoreTracker';
 import { DocumentsManager } from '@/components/finance/DocumentsManager';
 import { ConnectedAccounts } from '@/components/finance/ConnectedAccounts';
+import { Loader2 } from 'lucide-react';
 
 export default function AxiomFinance() {
-  const { 
-    sidebarOpen, 
-    activeTab, 
-    layoutSettings, 
-    themeSettings,
-  } = useAppStore();
+  const router = useRouter();
+  const pathname = usePathname();
+  const supabase = createClient();
+  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<any>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [layoutSettings, setLayoutSettings] = useState({
+    sidebarPosition: 'left' as 'left' | 'right',
+    chatPanelOpen: false,
+    chatPanelWidth: 320,
+    chatPanelPosition: 'right' as 'left' | 'right',
+  });
+  const [themeSettings, setThemeSettings] = useState({
+    mode: 'dark' as 'light' | 'dark',
+    colorScheme: 'cyan',
+    accentColor: '#00e5ff',
+  });
 
-  // Apply theme on mount and when it changes
+  useEffect(() => {
+    // Check auth state
+    const checkAuth = async () => {
+      const { data: { session: supabaseSession } } = await supabase.auth.getSession();
+      setSession(supabaseSession);
+      setLoading(false);
+    };
+
+    checkAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (!session && pathname !== '/signin') {
+        router.push('/signin');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [pathname, router, supabase]);
+
+  // Apply theme on mount
   useEffect(() => {
     const root = document.documentElement;
-    
-    // Apply mode
     if (themeSettings.mode === 'light') {
       root.classList.remove('dark');
       root.classList.add('light');
@@ -36,15 +69,16 @@ export default function AxiomFinance() {
       root.classList.remove('light');
       root.classList.add('dark');
     }
-    
-    // Apply color scheme
     root.setAttribute('data-color-scheme', themeSettings.colorScheme);
-    
-    // Apply accent color as CSS variable
-    if (themeSettings.accentColor) {
-      root.style.setProperty('--axiom-primary', themeSettings.accentColor);
-    }
+    root.style.setProperty('--axiom-primary', themeSettings.accentColor);
   }, [themeSettings]);
+
+  // Redirect to signin if not authenticated
+  useEffect(() => {
+    if (!loading && !session && pathname !== '/signin') {
+      router.push('/signin');
+    }
+  }, [loading, session, pathname, router]);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -75,6 +109,22 @@ export default function AxiomFinance() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
+      </div>
+    );
+  }
+
   const isRight = layoutSettings.sidebarPosition === 'right';
   const sidebarWidth = sidebarOpen ? 256 : 64;
   const chatWidth = layoutSettings.chatPanelOpen ? layoutSettings.chatPanelWidth : 0;
@@ -83,7 +133,16 @@ export default function AxiomFinance() {
   return (
     <div className="min-h-screen bg-background">
       {/* Sidebar */}
-      <AppSidebar />
+      <AppSidebar 
+        open={sidebarOpen} 
+        setOpen={setSidebarOpen}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        layoutSettings={layoutSettings}
+        setLayoutSettings={setLayoutSettings}
+        session={session}
+        supabase={supabase}
+      />
 
       {/* Chat Panel */}
       {layoutSettings.chatPanelOpen && <ChatPanel />}
@@ -108,13 +167,13 @@ export default function AxiomFinance() {
         <footer className="border-t border-border/30 py-4 px-6 bg-background/50 backdrop-blur-sm">
           <div className="flex items-center justify-between text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-[var(--axiom-primary)] animate-pulse" />
+              <div className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse" />
               <span>Axiom Finance</span>
               <span className="text-border">|</span>
               <span>Personal Financial Intelligence</span>
             </div>
             <div className="flex items-center gap-4">
-              <span>Data stored locally</span>
+              <span>Signed in as {session.user?.email}</span>
               <span className="text-border">|</span>
               <span>v2.0.0</span>
             </div>

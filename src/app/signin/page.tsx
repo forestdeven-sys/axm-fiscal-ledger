@@ -1,6 +1,6 @@
 'use client';
 
-import { signIn, useSession } from 'next-auth/react';
+import { createClient } from '@/lib/supabase/client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -16,35 +16,86 @@ import {
 
 export default function SignInPage() {
   const router = useRouter();
-  const { data: session } = useSession();
-  const [isLoading, setIsLoading] = useState<string | null>(null);
+  const supabase = createClient();
+  const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
-  // Redirect if already signed in
-  if (session) {
-    router.push('/');
-    return null;
-  }
-
-  const handleDemoSignIn = async (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading('demo');
-    
-    const result = await signIn('credentials', {
+    setIsLoading(true);
+    setError(null);
+
+    const { error } = await supabase.auth.signUp({
       email,
       password,
-      redirect: false,
     });
 
-    if (result?.ok) {
-      router.push('/');
+    if (error) {
+      setError(error.message);
+      setIsLoading(false);
     } else {
-      setIsLoading(null);
+      setError('Check your email to confirm your account!');
+      setIsLoading(false);
     }
   };
 
-  const isDemoConfigured = email && password;
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setError(error.message);
+      setIsLoading(false);
+    } else {
+      router.push('/');
+      router.refresh();
+    }
+  };
+
+  const handleDemoSignIn = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    // For demo, we create a session without real auth
+    // In production, you'd use Supabase Auth properly
+    const { error } = await supabase.auth.signInWithPassword({
+      email: 'demo@axiom.finance',
+      password: 'demodemo',
+    });
+
+    if (error) {
+      // If demo user doesn't exist, create it
+      if (error.message.includes('Invalid login')) {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: 'demo@axiom.finance',
+          password: 'demodemo',
+        });
+        
+        if (signUpError) {
+          setError(signUpError.message);
+        } else {
+          router.push('/');
+          router.refresh();
+        }
+      } else {
+        setError(error.message);
+      }
+    } else {
+      router.push('/');
+      router.refresh();
+    }
+    setIsLoading(false);
+  };
+
+  const isConfigured = email && password;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -68,19 +119,26 @@ export default function SignInPage() {
         </CardHeader>
         
         <CardContent className="space-y-6">
-          {/* Demo/Email Sign In - Always Available */}
-          <form onSubmit={handleDemoSignIn} className="space-y-4">
+          {/* Error message */}
+          {error && (
+            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Sign In Form */}
+          <form onSubmit={handleSignIn} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Email</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="email"
-                  placeholder="demo@axiom.finance"
+                  placeholder="you@example.com"
                   className="pl-10"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={!!isLoading}
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -91,33 +149,41 @@ export default function SignInPage() {
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="password"
-                  placeholder="Any password works"
+                  placeholder="••••••••"
                   className="pl-10"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  disabled={!!isLoading}
+                  disabled={isLoading}
                 />
               </div>
             </div>
 
-            <Button
-              type="submit"
-              className="w-full h-11 bg-gradient-to-r from-cyan-500 to-green-500 hover:from-cyan-400 hover:to-green-400"
-              disabled={!isDemoConfigured || !!isLoading}
-            >
-              {isLoading === 'demo' ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                'Sign In'
-              )}
-            </Button>
-            
-            <p className="text-xs text-center text-muted-foreground">
-              Demo mode: Enter any email/password to sign in
-            </p>
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                className="flex-1 h-11 bg-gradient-to-r from-cyan-500 to-green-500 hover:from-cyan-400 hover:to-green-400"
+                disabled={!isConfigured || isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  'Sign In'
+                )}
+              </Button>
+              
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSignUp}
+                disabled={!isConfigured || isLoading}
+                className="flex-1"
+              >
+                Sign Up
+              </Button>
+            </div>
           </form>
 
           <div className="relative">
@@ -126,36 +192,28 @@ export default function SignInPage() {
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">
-                Quick Demo
+                Or
               </span>
             </div>
           </div>
 
-          {/* Quick demo buttons */}
-          <div className="grid grid-cols-2 gap-3">
-            <Button
-              variant="outline"
-              className="h-10"
-              onClick={() => {
-                setEmail('demo@axiom.finance');
-                setPassword('demo123');
-              }}
-              disabled={!!isLoading}
-            >
-              Load Demo User
-            </Button>
-            <Button
-              variant="outline"
-              className="h-10"
-              onClick={() => {
-                setEmail('admin@axiom.finance');
-                setPassword('admin123');
-              }}
-              disabled={!!isLoading}
-            >
-              Load Admin
-            </Button>
-          </div>
+          {/* Demo Button */}
+          <Button
+            variant="outline"
+            className="w-full h-12"
+            onClick={handleDemoSignIn}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              'Try Demo Account'
+            )}
+          </Button>
+
+          <p className="text-xs text-center text-muted-foreground">
+            Demo account has sample financial data pre-loaded
+          </p>
         </CardContent>
       </Card>
     </div>
