@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { Dashboard } from '@/components/finance/Dashboard';
 import { TransactionsTable } from '@/components/finance/TransactionsTable';
@@ -20,7 +20,6 @@ import { Loader2 } from 'lucide-react';
 
 export default function AxiomFinance() {
   const router = useRouter();
-  const pathname = usePathname();
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
@@ -39,46 +38,43 @@ export default function AxiomFinance() {
   });
 
   useEffect(() => {
-    // Check auth state
-    const checkAuth = async () => {
-      const { data: { session: supabaseSession } } = await supabase.auth.getSession();
-      setSession(supabaseSession);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
       setLoading(false);
-    };
-
-    checkAuth();
+    });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (!session && pathname !== '/signin') {
-        router.push('/signin');
-      }
     });
 
     return () => subscription.unsubscribe();
-  }, [pathname, router, supabase]);
+  }, [supabase]);
 
   // Apply theme on mount
   useEffect(() => {
     const root = document.documentElement;
-    if (themeSettings.mode === 'light') {
-      root.classList.remove('dark');
-      root.classList.add('light');
-    } else {
-      root.classList.remove('light');
-      root.classList.add('dark');
-    }
-    root.setAttribute('data-color-scheme', themeSettings.colorScheme);
-    root.style.setProperty('--axiom-primary', themeSettings.accentColor);
-  }, [themeSettings]);
+    root.classList.add('dark');
+    root.setAttribute('data-color-scheme', 'cyan');
+    root.style.setProperty('--axiom-primary', '#00e5ff');
+  }, []);
 
-  // Redirect to signin if not authenticated
+  // Redirect to signin if no session (only after loading completes)
   useEffect(() => {
-    if (!loading && !session && pathname !== '/signin') {
+    if (!loading && !session) {
       router.push('/signin');
     }
-  }, [loading, session, pathname, router]);
+  }, [loading, session, router]);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/signin');
+  };
+
+  const updateLayoutSettings = (newSettings: Partial<typeof layoutSettings>) => {
+    setLayoutSettings(prev => ({ ...prev, ...newSettings }));
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -112,7 +108,10 @@ export default function AxiomFinance() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-cyan-500 mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
       </div>
     );
   }
@@ -120,7 +119,10 @@ export default function AxiomFinance() {
   if (!session) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-cyan-500 mx-auto mb-4" />
+          <p className="text-muted-foreground">Redirecting to sign in...</p>
+        </div>
       </div>
     );
   }
@@ -139,9 +141,8 @@ export default function AxiomFinance() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         layoutSettings={layoutSettings}
-        setLayoutSettings={setLayoutSettings}
-        session={session}
-        supabase={supabase}
+        updateLayoutSettings={updateLayoutSettings}
+        onSignOut={handleSignOut}
       />
 
       {/* Chat Panel */}
@@ -173,7 +174,7 @@ export default function AxiomFinance() {
               <span>Personal Financial Intelligence</span>
             </div>
             <div className="flex items-center gap-4">
-              <span>Signed in as {session.user?.email}</span>
+              <span>{session.user?.email}</span>
               <span className="text-border">|</span>
               <span>v2.0.0</span>
             </div>

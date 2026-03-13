@@ -1,7 +1,7 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,21 +11,36 @@ import {
   Mail, 
   Loader2, 
   Lock,
-  TrendingUp
+  TrendingUp,
+  CheckCircle
 } from 'lucide-react';
 
 export default function SignInPage() {
   const router = useRouter();
   const supabase = createClient();
   const [isLoading, setIsLoading] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Check if already logged in
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.push('/');
+      } else {
+        setIsChecking(false);
+      }
+    };
+    checkSession();
+  }, [router, supabase]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError(null);
+    setMessage(null);
 
     const { error } = await supabase.auth.signUp({
       email,
@@ -33,18 +48,17 @@ export default function SignInPage() {
     });
 
     if (error) {
-      setError(error.message);
-      setIsLoading(false);
+      setMessage({ type: 'error', text: error.message });
     } else {
-      setError('Check your email to confirm your account!');
-      setIsLoading(false);
+      setMessage({ type: 'success', text: '✓ Check your email to confirm your account, then sign in!' });
     }
+    setIsLoading(false);
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError(null);
+    setMessage(null);
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -52,7 +66,7 @@ export default function SignInPage() {
     });
 
     if (error) {
-      setError(error.message);
+      setMessage({ type: 'error', text: error.message });
       setIsLoading(false);
     } else {
       router.push('/');
@@ -62,31 +76,35 @@ export default function SignInPage() {
 
   const handleDemoSignIn = async () => {
     setIsLoading(true);
-    setError(null);
+    setMessage(null);
 
-    // For demo, we create a session without real auth
-    // In production, you'd use Supabase Auth properly
     const { error } = await supabase.auth.signInWithPassword({
       email: 'demo@axiom.finance',
-      password: 'demodemo',
+      password: 'demodemo123',
     });
 
     if (error) {
-      // If demo user doesn't exist, create it
-      if (error.message.includes('Invalid login')) {
-        const { error: signUpError } = await supabase.auth.signUp({
+      // Create demo account if doesn't exist
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: 'demo@axiom.finance',
+        password: 'demodemo123',
+      });
+      
+      if (signUpError) {
+        setMessage({ type: 'error', text: signUpError.message });
+      } else {
+        // Sign in after creating
+        const { error: signInError } = await supabase.auth.signInWithPassword({
           email: 'demo@axiom.finance',
-          password: 'demodemo',
+          password: 'demodemo123',
         });
         
-        if (signUpError) {
-          setError(signUpError.message);
+        if (signInError) {
+          setMessage({ type: 'error', text: signInError.message });
         } else {
           router.push('/');
           router.refresh();
         }
-      } else {
-        setError(error.message);
       }
     } else {
       router.push('/');
@@ -94,6 +112,14 @@ export default function SignInPage() {
     }
     setIsLoading(false);
   };
+
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
+      </div>
+    );
+  }
 
   const isConfigured = email && password;
 
@@ -113,16 +139,16 @@ export default function SignInPage() {
               Axiom Finance
             </CardTitle>
             <CardDescription className="mt-2">
-              Sign in to access your financial dashboard
+              Your AI-Powered Financial Dashboard
             </CardDescription>
           </div>
         </CardHeader>
         
         <CardContent className="space-y-6">
-          {/* Error message */}
-          {error && (
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-              {error}
+          {/* Message */}
+          {message && (
+            <div className={`p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-green-500/10 border border-green-500/20 text-green-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
+              {message.text}
             </div>
           )}
 
@@ -167,7 +193,7 @@ export default function SignInPage() {
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Signing in...
+                    Please wait...
                   </>
                 ) : (
                   'Sign In'
@@ -207,12 +233,15 @@ export default function SignInPage() {
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              'Try Demo Account'
+              <>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Try Free Demo
+              </>
             )}
           </Button>
 
           <p className="text-xs text-center text-muted-foreground">
-            Demo account has sample financial data pre-loaded
+            Demo includes sample transactions, budgets, investments & more
           </p>
         </CardContent>
       </Card>

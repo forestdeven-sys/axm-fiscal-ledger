@@ -2,7 +2,6 @@
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Receipt,
@@ -20,7 +19,6 @@ import {
   PanelRightClose,
   LogOut,
 } from 'lucide-react';
-import type { SupabaseClient } from '@supabase/supabase-js';
 
 const navigation = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -45,9 +43,8 @@ interface AppSidebarProps {
     chatPanelWidth: number;
     chatPanelPosition: 'left' | 'right';
   };
-  setLayoutSettings: (settings: any) => void;
-  session: any;
-  supabase: SupabaseClient;
+  updateLayoutSettings: (settings: Partial<typeof layoutSettings>) => void;
+  onSignOut: () => void;
 }
 
 export function AppSidebar({ 
@@ -57,17 +54,8 @@ export function AppSidebar({
   setActiveTab,
   layoutSettings,
   updateLayoutSettings,
-  session,
-  supabase 
-}: AppSidebarProps & { updateLayoutSettings?: (settings: any) => void }) {
-  const router = useRouter();
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push('/signin');
-    router.refresh();
-  };
-
+  onSignOut,
+}: AppSidebarProps) {
   const isRight = layoutSettings.sidebarPosition === 'right';
   const chatPanelOpen = layoutSettings.chatPanelOpen;
   const chatPanelPosition = layoutSettings.chatPanelPosition;
@@ -179,7 +167,7 @@ export function AppSidebar({
 
         {/* Sign Out Button */}
         <button
-          onClick={handleSignOut}
+          onClick={onSignOut}
           className={cn(
             'w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all',
             'hover:bg-accent/50 hover:text-accent-foreground text-muted-foreground',
