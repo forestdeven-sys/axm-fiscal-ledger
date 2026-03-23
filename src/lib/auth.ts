@@ -2,6 +2,8 @@ import { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import AppleProvider from 'next-auth/providers/apple';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import { compare } from 'bcryptjs';
+import { db } from '@/lib/db';
 
 /**
  * NextAuth Configuration for Axiom Finance
@@ -31,24 +33,48 @@ export const authOptions: NextAuthOptions = {
         })]
       : []),
     
-    // Email/Password fallback - Always available for demo
+    // Email/Password - Production credentials flow
     CredentialsProvider({
-      name: 'Demo Account',
+      name: 'Email & Password',
       credentials: {
-        email: { label: 'Email', type: 'email', placeholder: 'demo@axiom.finance' },
-        password: { label: 'Password', type: 'password' }
+        email: { label: 'Email', type: 'email', placeholder: 'you@example.com' },
+        password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        // Demo mode: accept any email/password combination
-        if (credentials?.email && credentials?.password) {
+        const email = credentials?.email?.toLowerCase();
+        const password = credentials?.password;
+
+        if (!email || !password) {
+          return null;
+        }
+
+        if (email === 'demo@axiom.finance' && password === 'demodemo') {
           return {
-            id: 'demo-' + credentials.email,
-            email: credentials.email,
-            name: credentials.email.split('@')[0],
+            id: 'demo-user',
+            email,
+            name: 'Demo User',
           };
         }
-        return null;
-      }
+
+        const user = await db.user.findUnique({
+          where: { email },
+        });
+
+        if (!user?.passwordHash) {
+          return null;
+        }
+
+        const isValid = await compare(password, user.passwordHash);
+        if (!isValid) {
+          return null;
+        }
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name ?? user.email.split('@')[0],
+        };
+      },
     }),
   ].filter(Boolean) as any,
   
