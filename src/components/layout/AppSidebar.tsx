@@ -144,7 +144,13 @@ export function AppSidebar({
         {/* Toggle Chat Button */}
         {open && (
           <button
-            onClick={() => updateLayoutSettings({ chatPanelOpen: !chatPanelOpen })}
+            onClick={() => {
+              if (updateLayoutSettings) {
+                updateLayoutSettings({ chatPanelOpen: !chatPanelOpen });
+              } else {
+                setLayoutSettings({ ...layoutSettings, chatPanelOpen: !chatPanelOpen });
+              }
+            }}
             className={cn(
               'w-full flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground transition-all mb-1',
               isRight && 'flex-row-reverse'

@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       try {
         const instResponse = await plaidClient.institutionsGetById({
           institution_id: institutionId,
-          country_codes: ['US'],
+          country_codes: ['US' as any],
         });
         institutionName = instResponse.data.institution?.name || 'Unknown Bank';
       } catch (e) {

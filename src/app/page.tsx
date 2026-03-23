@@ -140,6 +140,7 @@ export default function AxiomFinance() {
         setActiveTab={setActiveTab}
         layoutSettings={layoutSettings}
         setLayoutSettings={setLayoutSettings}
+        updateLayoutSettings={(settings) => setLayoutSettings(prev => ({ ...prev, ...settings }))}
         session={session}
         supabase={supabase}
       />

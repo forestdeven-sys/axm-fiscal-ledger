@@ -226,7 +226,7 @@ export function FileUpload() {
     }
     
     // Check for duplicates
-    const existingIds = new Set(transactions.map(t => t.externalId).filter(Boolean));
+    const existingIds = new Set(transactions.map(t => t.externalId).filter((id): id is string => !!id));
     let duplicates = 0;
     
     const newTransactions = allTransactions.filter((t) => {
@@ -252,14 +252,23 @@ export function FileUpload() {
   const handleImport = () => {
     if (!parseResult) return;
     
-    const newTransactions: Transaction[] = parseResult.transactions.map((t, i) => ({
+    const newTransactions: Transaction[] = parseResult.transactions.map((t) => ({
       id: crypto.randomUUID(),
       transactionDate: t.transactionDate,
       clearingDate: t.clearingDate,
       description: t.description,
       merchant: t.merchant,
       category: t.category,
-      type: t.type,
+      type: (() => {
+        const lc = t.type.toLowerCase();
+        if (lc === 'payment') return 'payment' as const;
+        if (lc === 'refund') return 'refund' as const;
+        if (lc === 'transfer') return 'transfer' as const;
+        if (lc === 'interest') return 'interest' as const;
+        if (lc === 'fee') return 'fee' as const;
+        if (lc === 'credit') return 'credit' as const;
+        return 'debit' as const;
+      })(),
       amount: t.amount,
       currency: 'USD',
       source: t.source,

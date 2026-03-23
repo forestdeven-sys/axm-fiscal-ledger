@@ -18,12 +18,13 @@ export interface Transaction {
   source: string;
   sourceFile?: string;
   userCategory?: string;
-  tags?: string[];
+  tags?: string;
   notes?: string;
   aiCategory?: string;
   aiConfidence?: number;
   isRecurring: boolean;
   accountId?: string;
+  externalId?: string;
 }
 
 export interface Budget {
@@ -62,7 +63,9 @@ export interface Investment {
   quantity: number;
   purchasePrice: number;
   currentPrice: number;
-  purchaseDate: string;
+  purchaseDate?: string;
+  totalReturn?: number;
+  totalReturnPercent?: number;
   accountId?: string;
   logo?: string;
 }
@@ -71,18 +74,21 @@ export interface InvestmentAccount {
   id: string;
   name: string;
   type: 'brokerage' | 'retirement' | 'crypto';
-  institution: string;
+  institution?: string;
+  provider?: string;
   balance: number;
-  holdings: Investment[];
-  connected: boolean;
+  holdings?: Investment[];
+  connected?: boolean;
 }
 
 export interface CreditScore {
-  id: string;
+  id?: string;
   score: number;
-  provider: string;
-  date: string;
+  provider?: string;
+  date?: string;
   previousScore?: number;
+  lastUpdated?: string;
+  history?: { date: string; score: number }[];
   factors?: {
     name: string;
     impact: 'positive' | 'negative' | 'neutral';
@@ -93,11 +99,13 @@ export interface CreditScore {
 export interface FinancialGoal {
   id: string;
   name: string;
-  type: 'savings' | 'debt_payoff' | 'investment' | 'emergency_fund' | 'custom';
+  type?: 'savings' | 'debt_payoff' | 'investment' | 'emergency_fund' | 'custom';
   targetAmount: number;
   currentAmount: number;
   deadline?: string;
+  priority?: 'high' | 'medium' | 'low';
   category?: string;
+  monthlyContribution?: number;
   icon?: string;
   color?: string;
 }
@@ -105,13 +113,14 @@ export interface FinancialGoal {
 export interface ConnectedAccount {
   id: string;
   name: string;
-  type: 'bank' | 'credit_card' | 'investment' | 'crypto_wallet';
+  type: 'bank' | 'credit_card' | 'investment' | 'crypto_wallet' | 'checking' | 'savings' | 'credit';
   institution: string;
   accountNumber?: string;
+  mask?: string;
   balance: number;
-  availableBalance: number;
-  currency: string;
-  status: 'connected' | 'disconnected' | 'error';
+  availableBalance?: number;
+  currency?: string;
+  status?: 'connected' | 'disconnected' | 'error';
   lastSynced?: string;
   logo?: string;
   color?: string;
@@ -139,6 +148,36 @@ export interface AIAgent {
   hasWebSearch: boolean;
 }
 
+// DeFAI Trading Types
+export interface DeFAIAgent {
+  id: string;
+  name: string;
+  agentType: 'signal' | 'execution' | 'simulation' | 'competitor-tracker';
+  status: 'idle' | 'running' | 'paused' | 'error';
+  totalTrades: number;
+  winRate: number;
+  totalProfit: number;
+  modelProvider?: string;
+  modelName?: string;
+  config?: string;
+}
+
+export interface DeFAITrade {
+  id: string;
+  tokenPair: string;
+  tradeType: string;
+  direction: string;
+  amountIn: number;
+  amountOut?: number;
+  profitUsd?: number;
+  status: string;
+  isSimulation: boolean;
+  modelUsed?: string;
+  confidence?: number;
+  reasoning?: string;
+  createdAt: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -157,11 +196,20 @@ export interface ChatSession {
 }
 
 export interface AISettings {
-  provider: string;
+  provider?: string;
   model: string;
   apiKey: string;
   webSearchApiKey?: string;
   webSearchEnabled: boolean;
+  // Extended fields used by various components
+  primaryApiKey?: string;
+  openRouterApiKey?: string;
+  primaryModelName?: string;
+  primaryModelProvider?: string;
+  tradingModelName?: string;
+  tradingModelProvider?: string;
+  reasoningModelName?: string;
+  docReaderModelName?: string;
 }
 
 export interface ThemeSettings {
@@ -196,6 +244,11 @@ interface AppState {
     dateFormat: string;
     privacyMode: boolean;
     showCents: boolean;
+    // DeFAI trading settings
+    paperTradingMode?: boolean;
+    startingCapital?: number;
+    maxGasPriceGwei?: number;
+    slippageTolerance?: number;
   };
   
   // AI Settings
@@ -218,6 +271,10 @@ interface AppState {
   // AI Agents
   agents: AIAgent[];
   activeAgentId?: string;
+  
+  // DeFAI Trading
+  defaiAgents: DeFAIAgent[];
+  defaiTrades: DeFAITrade[];
   
   // Chat
   currentChatSession: ChatSession | null;
@@ -279,6 +336,12 @@ interface AppState {
   updateAgent: (id: string, updates: Partial<AIAgent>) => void;
   deleteAgent: (id: string) => void;
   setActiveAgent: (id: string | undefined) => void;
+  
+  // DeFAI Actions
+  addDeFAIAgent: (agent: DeFAIAgent) => void;
+  updateDeFAIAgent: (id: string, updates: Partial<DeFAIAgent>) => void;
+  addDeFAITrade: (trade: DeFAITrade) => void;
+  clearDeFAITrades: () => void;
   
   // Chat Actions
   createChatSession: (agentId?: string) => void;
@@ -515,9 +578,9 @@ export const useAppStore = create<AppState>()(
         ],
       },
       creditScoreHistory: [
-        { date: new Date(Date.now() - 30 * 86400000).toISOString(), score: 738 },
-        { date: new Date(Date.now() - 60 * 86400000).toISOString(), score: 735 },
-        { date: new Date(Date.now() - 90 * 86400000).toISOString(), score: 730 },
+        { id: 'h1', score: 738, provider: 'Experian', date: new Date(Date.now() - 30 * 86400000).toISOString() },
+        { id: 'h2', score: 735, provider: 'Experian', date: new Date(Date.now() - 60 * 86400000).toISOString() },
+        { id: 'h3', score: 730, provider: 'Experian', date: new Date(Date.now() - 90 * 86400000).toISOString() },
       ],
       financialGoals: [
         { id: '1', name: 'Emergency Fund', targetAmount: 10000, currentAmount: 7500, deadline: new Date(Date.now() + 90 * 86400000).toISOString(), priority: 'high', category: 'Savings', monthlyContribution: 500 },
@@ -536,6 +599,10 @@ export const useAppStore = create<AppState>()(
       // AI Agents
       agents: defaultAgents,
       activeAgentId: 'budget-optimizer',
+      
+      // DeFAI Trading
+      defaiAgents: [],
+      defaiTrades: [],
       
       // Chat
       currentChatSession: null,
@@ -684,6 +751,20 @@ export const useAppStore = create<AppState>()(
       })),
       setActiveAgent: (id) => set({ activeAgentId: id }),
       
+      // DeFAI Actions
+      addDeFAIAgent: (agent) => set((state) => ({
+        defaiAgents: [...state.defaiAgents, agent]
+      })),
+      updateDeFAIAgent: (id, updates) => set((state) => ({
+        defaiAgents: state.defaiAgents.map((a) =>
+          a.id === id ? { ...a, ...updates } : a
+        )
+      })),
+      addDeFAITrade: (trade) => set((state) => ({
+        defaiTrades: [...state.defaiTrades, trade]
+      })),
+      clearDeFAITrades: () => set({ defaiTrades: [] }),
+      
       // Chat Actions
       createChatSession: (agentId) => {
         const newSession: ChatSession = {
@@ -759,6 +840,8 @@ export const useAppStore = create<AppState>()(
         documents: state.documents,
         agents: state.agents,
         activeAgentId: state.activeAgentId,
+        defaiAgents: state.defaiAgents,
+        defaiTrades: state.defaiTrades,
         chatSessions: state.chatSessions,
       }),
     }

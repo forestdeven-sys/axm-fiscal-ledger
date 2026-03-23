@@ -48,11 +48,13 @@ const ITEMS_PER_PAGE = 50;
 
 const TRANSACTION_TYPES = [
   { value: 'all', label: 'All Types' },
-  { value: 'Purchase', label: 'Purchase' },
-  { value: 'Payment', label: 'Payment' },
-  { value: 'Interest', label: 'Interest' },
-  { value: 'Refund', label: 'Refund' },
-  { value: 'Transfer', label: 'Transfer' },
+  { value: 'debit', label: 'Debit' },
+  { value: 'credit', label: 'Credit' },
+  { value: 'payment', label: 'Payment' },
+  { value: 'refund', label: 'Refund' },
+  { value: 'transfer', label: 'Transfer' },
+  { value: 'interest', label: 'Interest' },
+  { value: 'fee', label: 'Fee' },
 ];
 
 const CATEGORIES = [
@@ -148,11 +150,11 @@ export function TransactionsTable() {
       t.userCategory || t.aiCategory || t.category || 'Other',
       t.type,
       t.amount.toString(),
-      t.tags || '',
+      typeof t.tags === 'string' ? t.tags : (t.tags || ''),
       t.notes || '',
     ]);
 
-    const csv = [headers, ...rows].map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n');
+    const csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell)}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -167,7 +169,7 @@ export function TransactionsTable() {
     setEditingTransaction(transaction);
     setEditForm({
       category: transaction.userCategory || transaction.aiCategory || transaction.category || '',
-      tags: transaction.tags || '',
+      tags: typeof transaction.tags === 'string' ? transaction.tags : (transaction.tags || ''),
       notes: transaction.notes || '',
     });
     setEditDialogOpen(true);
@@ -314,9 +316,10 @@ export function TransactionsTable() {
                         <Badge
                           variant="outline"
                           className={
-                            transaction.type === 'Payment' ? 'text-[var(--axiom-green)] border-[var(--axiom-green)]/30' :
-                            transaction.type === 'Interest' ? 'text-[var(--axiom-red)] border-[var(--axiom-red)]/30' :
-                            transaction.type === 'Refund' ? 'text-[var(--axiom-cyan)] border-[var(--axiom-cyan)]/30' :
+                            transaction.type === 'payment' ? 'text-green-500 border-green-500/30' :
+                            transaction.type === 'credit' ? 'text-green-500 border-green-500/30' :
+                            transaction.type === 'interest' ? 'text-red-500 border-red-500/30' :
+                            transaction.type === 'refund' ? 'text-cyan-500 border-cyan-500/30' :
                             ''
                           }
                         >

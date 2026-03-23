@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     // Create link token request
     const response = await plaidClient.linkTokenCreate({
       user: {
-        client_user_id: session.user.id,
+        client_user_id: (session.user as any).id || session.user.email || 'anonymous',
       },
       client_name: 'Axiom Finance',
       products: PLAID_PRODUCTS,
