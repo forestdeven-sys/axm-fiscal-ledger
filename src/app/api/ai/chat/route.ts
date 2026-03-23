@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AISettings, Transaction } from '@/store';
 
 interface ChatRequest {
   message: string;
-  transactions: Transaction[];
-  settings: AISettings;
+  financialContext?: string;
+  agentPrompt?: string;
+  enableWebSearch?: boolean;
 }
 
-// System prompt for Axiom Financial Architect
 const SYSTEM_PROMPT = `You are the Axiom Financial Architect, an expert-level autonomous financial planner. Your goal is to maximize the user's net worth and liquidity while maintaining total transparency.
 
 **Operational Rules:**
@@ -27,111 +26,111 @@ const SYSTEM_PROMPT = `You are the Axiom Financial Architect, an expert-level au
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, transactions, settings } = await request.json() as ChatRequest;
-    
-    // Check if privacy mode is enabled
-    if (!settings.primaryApiKey && !settings.openRouterApiKey) {
-      return new NextResponse(
-        JSON.stringify({ error: 'No API key configured. Please add an API key in Settings.' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+    const body = await request.json() as ChatRequest;
+    const { message, financialContext, agentPrompt } = body;
+
+    if (!message) {
+      return NextResponse.json(
+        { error: 'Message is required' },
+        { status: 400 }
       );
     }
 
-    // Build financial context from transactions
-    const now = new Date();
-    const thisMonthTx = transactions.filter(t => {
-      const date = new Date(t.transactionDate);
-      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-    });
-    
-    const totalSpent = thisMonthTx.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
-    const totalPayments = thisMonthTx.filter(t => t.type === 'Payment').reduce((sum, t) => sum + Math.abs(t.amount), 0);
-    const totalInterest = thisMonthTx.filter(t => t.type === 'Interest').reduce((sum, t) => sum + t.amount, 0);
-    
-    // Get top categories
-    const categories: Record<string, number> = {};
-    thisMonthTx.forEach(t => {
-      const cat = t.userCategory || t.aiCategory || t.category || 'Other';
-      if (t.amount > 0) {
-        categories[cat] = (categories[cat] || 0) + t.amount;
-      }
-    });
-    const topCategories = Object.entries(categories)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([name, amount]) => ({ name, amount }));
+    const apiKey = process.env.OPENROUTER_API_KEY;
 
-    // Get top merchants
-    const merchants: Record<string, number> = {};
-    thisMonthTx.forEach(t => {
-      const merchant = t.merchant || t.description;
-      if (t.amount > 0) {
-        merchants[merchant] = (merchants[merchant] || 0) + t.amount;
-      }
-    });
-    const topMerchants = Object.entries(merchants)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10);
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'AI is not configured. Please set OPENROUTER_API_KEY in your environment variables.' },
+        { status: 400 }
+      );
+    }
 
-    // Build context
-    const financialContext = `
-User's financial snapshot:
-- Date range: Last 90 days
-- Total transactions: ${transactions.length}
-- This month's transactions: ${thisMonthTx.length}
-- Total spent this month: $${totalSpent.toFixed(2)}
-- Total payments this month: $${totalPayments.toFixed(2)}
-- Total interest paid this month: $${totalInterest.toFixed(2)}
+    const systemContent = [
+      agentPrompt || SYSTEM_PROMPT,
+      financialContext ? `\n\n${financialContext}` : '',
+    ].join('');
 
-Top 5 categories by spend:
-${topCategories.map(c => `- ${c.name}: $${c.amount.toFixed(2)}`).join('\n')}
-
-Top 10 merchants by spend:
-${topMerchants.map(m => `- ${m[0]}: $${m[1].toFixed(2)}`).join('\n')}
-
-Recent transactions (last 20):
-${transactions.slice(0, 20).map(t => 
-  `- ${t.transactionDate}: ${t.merchant || t.description} | $${t.amount.toFixed(2)} | ${t.type} | ${t.userCategory || t.category || 'Other'}`
-).join('\n')}
-`;
-
-    // Use z-ai-web-dev-sdk
-    const { LLM } = await import('z-ai-web-dev-sdk');
-    
-    const apiKey = settings.openRouterApiKey || settings.primaryApiKey;
-    const modelName = settings.primaryModelName || 'glm-4-flash';
-    
-    // Create streaming response
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          const llm = new LLM({
-            apiKey: process.env.ZAI_API_KEY || apiKey,
-            model: modelName.includes('/') ? modelName : `openai/${modelName}`,
+          const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+              'HTTP-Referer': process.env.NEXTAUTH_URL || 'https://axiom.finance',
+            },
+            body: JSON.stringify({
+              model: 'xiaomi/mimo-v2-flash',
+              messages: [
+                { role: 'system', content: systemContent },
+                { role: 'user', content: message },
+              ],
+              stream: true,
+            }),
           });
 
-          const messages = [
-            { role: 'system', content: SYSTEM_PROMPT + '\n\n' + financialContext },
-            { role: 'user', content: message },
-          ];
+          if (!response.ok) {
+            const errorText = await response.text();
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ content: `[Error: AI service returned ${response.status}. Please check your API key.]` })}\n\n`
+              )
+            );
+            controller.close();
+            return;
+          }
 
-          const response = await llm.chat({
-            messages,
-            stream: true,
-          });
+          const reader = response.body?.getReader();
+          if (!reader) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ content: '[Error: No response stream available]' })}\n\n`
+              )
+            );
+            controller.close();
+            return;
+          }
 
-          for await (const chunk of response) {
-            const content = chunk.choices?.[0]?.delta?.content || '';
-            if (content) {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed || trimmed === 'data: [DONE]') continue;
+              if (!trimmed.startsWith('data: ')) continue;
+
+              try {
+                const data = JSON.parse(trimmed.slice(6));
+                const content = data.choices?.[0]?.delta?.content;
+                if (content) {
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ content })}\n\n`)
+                  );
+                }
+              } catch {
+                // Skip malformed JSON chunks
+              }
             }
           }
 
           controller.close();
         } catch (error) {
-          console.error('LLM error:', error);
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: '\n\n[Error: Failed to get response from AI. Please check your API key and try again.]' })}\n\n`));
+          console.error('AI streaming error:', error);
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ content: '\n\n[Error: Failed to get response from AI. Please try again.]' })}\n\n`
+            )
+          );
           controller.close();
         }
       },

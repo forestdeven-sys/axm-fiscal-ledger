@@ -62,27 +62,32 @@ export interface Investment {
   quantity: number;
   purchasePrice: number;
   currentPrice: number;
-  purchaseDate: string;
+  purchaseDate?: string;
   accountId?: string;
   logo?: string;
+  totalReturn?: number;
+  totalReturnPercent?: number;
 }
 
 export interface InvestmentAccount {
   id: string;
   name: string;
   type: 'brokerage' | 'retirement' | 'crypto';
-  institution: string;
+  institution?: string;
+  provider?: string;
   balance: number;
-  holdings: Investment[];
-  connected: boolean;
+  holdings?: Investment[];
+  connected?: boolean;
 }
 
 export interface CreditScore {
-  id: string;
+  id?: string;
   score: number;
-  provider: string;
-  date: string;
+  provider?: string;
+  date?: string;
+  lastUpdated?: string;
   previousScore?: number;
+  history?: { date: string; score: number }[];
   factors?: {
     name: string;
     impact: 'positive' | 'negative' | 'neutral';
@@ -93,28 +98,31 @@ export interface CreditScore {
 export interface FinancialGoal {
   id: string;
   name: string;
-  type: 'savings' | 'debt_payoff' | 'investment' | 'emergency_fund' | 'custom';
+  type?: 'savings' | 'debt_payoff' | 'investment' | 'emergency_fund' | 'custom';
   targetAmount: number;
   currentAmount: number;
   deadline?: string;
   category?: string;
   icon?: string;
   color?: string;
+  priority?: 'low' | 'medium' | 'high';
+  monthlyContribution?: number;
 }
 
 export interface ConnectedAccount {
   id: string;
   name: string;
-  type: 'bank' | 'credit_card' | 'investment' | 'crypto_wallet';
+  type: string;
   institution: string;
   accountNumber?: string;
   balance: number;
-  availableBalance: number;
-  currency: string;
-  status: 'connected' | 'disconnected' | 'error';
+  availableBalance?: number;
+  currency?: string;
+  status?: 'connected' | 'disconnected' | 'error';
   lastSynced?: string;
   logo?: string;
   color?: string;
+  mask?: string;
 }
 
 export interface Document {
@@ -162,6 +170,36 @@ export interface AISettings {
   apiKey: string;
   webSearchApiKey?: string;
   webSearchEnabled: boolean;
+  primaryApiKey?: string;
+  openRouterApiKey?: string;
+  primaryModelName?: string;
+  tradingModelName?: string;
+}
+
+export interface DeFAITrade {
+  id: string;
+  tokenPair: string;
+  tradeType: string;
+  direction: string;
+  amountIn: number;
+  amountOut: number;
+  profitUsd: number;
+  status: string;
+  isSimulation: boolean;
+  modelUsed?: string;
+  confidence: number;
+  reasoning: string;
+  createdAt: Date;
+}
+
+export interface DeFAIAgent {
+  id: string;
+  name: string;
+  agentType: string;
+  status: string;
+  totalTrades: number;
+  winRate: number;
+  totalProfit: number;
 }
 
 export interface ThemeSettings {

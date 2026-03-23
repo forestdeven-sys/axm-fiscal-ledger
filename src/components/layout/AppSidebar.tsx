@@ -50,16 +50,16 @@ interface AppSidebarProps {
   supabase: SupabaseClient;
 }
 
-export function AppSidebar({ 
-  open, 
-  setOpen, 
-  activeTab, 
+export function AppSidebar({
+  open,
+  setOpen,
+  activeTab,
   setActiveTab,
   layoutSettings,
-  updateLayoutSettings,
+  setLayoutSettings,
   session,
-  supabase 
-}: AppSidebarProps & { updateLayoutSettings?: (settings: any) => void }) {
+  supabase
+}: AppSidebarProps) {
   const router = useRouter();
 
   const handleSignOut = async () => {
@@ -144,7 +144,7 @@ export function AppSidebar({
         {/* Toggle Chat Button */}
         {open && (
           <button
-            onClick={() => updateLayoutSettings({ chatPanelOpen: !chatPanelOpen })}
+            onClick={() => setLayoutSettings({ ...layoutSettings, chatPanelOpen: !chatPanelOpen })}
             className={cn(
               'w-full flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground transition-all mb-1',
               isRight && 'flex-row-reverse'

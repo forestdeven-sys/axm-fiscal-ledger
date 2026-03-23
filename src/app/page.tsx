@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter, usePathname } from 'next/navigation';
 import { AppSidebar } from '@/components/layout/AppSidebar';
@@ -21,7 +21,7 @@ import { Loader2 } from 'lucide-react';
 export default function AxiomFinance() {
   const router = useRouter();
   const pathname = usePathname();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -39,7 +39,6 @@ export default function AxiomFinance() {
   });
 
   useEffect(() => {
-    // Check auth state
     const checkAuth = async () => {
       const { data: { session: supabaseSession } } = await supabase.auth.getSession();
       setSession(supabaseSession);
@@ -48,7 +47,6 @@ export default function AxiomFinance() {
 
     checkAuth();
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (!session && pathname !== '/signin') {
@@ -59,7 +57,7 @@ export default function AxiomFinance() {
     return () => subscription.unsubscribe();
   }, [pathname, router, supabase]);
 
-  // Apply theme on mount
+  // Apply theme
   useEffect(() => {
     const root = document.documentElement;
     if (themeSettings.mode === 'light') {
@@ -133,8 +131,8 @@ export default function AxiomFinance() {
   return (
     <div className="min-h-screen bg-background">
       {/* Sidebar */}
-      <AppSidebar 
-        open={sidebarOpen} 
+      <AppSidebar
+        open={sidebarOpen}
         setOpen={setSidebarOpen}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -151,10 +149,10 @@ export default function AxiomFinance() {
       <main
         className="min-h-screen transition-all duration-300"
         style={{
-          marginLeft: isRight 
+          marginLeft: isRight
             ? (chatIsRight ? 0 : chatWidth)
             : sidebarWidth + (chatIsRight ? 0 : chatWidth),
-          marginRight: isRight 
+          marginRight: isRight
             ? sidebarWidth + (chatIsRight ? chatWidth : 0)
             : (chatIsRight ? chatWidth : 0),
         }}
