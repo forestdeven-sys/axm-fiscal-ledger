@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { type User } from '@supabase/supabase-js';
+
 interface Profile {
   id: string;
   email: string | null;
@@ -33,7 +35,7 @@ export function UserProfile() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [fullName, setFullName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -132,7 +134,7 @@ export function UserProfile() {
   }
 
   const initials = fullName
-    ? fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    ? fullName.split(' ').filter(n => n.length > 0).map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.charAt(0).toUpperCase() || 'U';
 
   const memberSince = user?.created_at
