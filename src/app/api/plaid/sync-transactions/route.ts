@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getAuthUser } from '@/lib/supabase/auth';
 import { plaidClient, isPlaidConfigured } from '@/lib/plaid';
 import { db } from '@/lib/db';
 
@@ -12,8 +11,8 @@ import { db } from '@/lib/db';
 export async function POST(request: NextRequest) {
   try {
     // Verify user is authenticated
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const authUser = await getAuthUser();
+    if (!authUser?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -27,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     // Get user from database
     const user = await db.user.findUnique({
-      where: { email: session.user.email },
+      where: { email: authUser.email },
     });
 
     if (!user) {

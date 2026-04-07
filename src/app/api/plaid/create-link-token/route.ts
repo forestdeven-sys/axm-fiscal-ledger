@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getAuthUser } from '@/lib/supabase/auth';
 import { plaidClient, PLAID_PRODUCTS, PLAID_COUNTRY_CODES, isPlaidConfigured } from '@/lib/plaid';
 
 /**
@@ -11,8 +10,8 @@ import { plaidClient, PLAID_PRODUCTS, PLAID_COUNTRY_CODES, isPlaidConfigured } f
 export async function POST(request: NextRequest) {
   try {
     // Verify user is authenticated
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const authUser = await getAuthUser();
+    if (!authUser?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -30,7 +29,7 @@ export async function POST(request: NextRequest) {
     // Create link token request
     const response = await plaidClient.linkTokenCreate({
       user: {
-        client_user_id: session.user.id,
+        client_user_id: authUser.id,
       },
       client_name: 'Axiom Finance',
       products: PLAID_PRODUCTS,

@@ -16,6 +16,7 @@ import { GoalsTracker } from '@/components/finance/GoalsTracker';
 import { CreditScoreTracker } from '@/components/finance/CreditScoreTracker';
 import { DocumentsManager } from '@/components/finance/DocumentsManager';
 import { ConnectedAccounts } from '@/components/finance/ConnectedAccounts';
+import { UserProfile } from '@/components/finance/UserProfile';
 import { Loader2 } from 'lucide-react';
 
 export default function AxiomFinance() {
@@ -94,6 +95,8 @@ export default function AxiomFinance() {
         return <GoalsTracker />;
       case 'accounts':
         return <ConnectedAccounts />;
+      case 'profile':
+        return <UserProfile />;
       case 'documents':
         return <DocumentsManager />;
       case 'credit':

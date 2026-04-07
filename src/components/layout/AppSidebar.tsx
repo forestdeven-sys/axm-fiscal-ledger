@@ -18,6 +18,7 @@ import {
   PanelLeftClose,
   PanelRightClose,
   LogOut,
+  UserCircle,
 } from 'lucide-react';
 
 const navigation = [
@@ -30,6 +31,7 @@ const navigation = [
   { id: 'accounts', label: 'Connected Accounts', icon: Link2 },
   { id: 'documents', label: 'Documents', icon: FileText },
   { id: 'credit', label: 'Credit Score', icon: CreditCard },
+  { id: 'profile', label: 'Profile', icon: UserCircle },
 ];
 
 interface AppSidebarProps {

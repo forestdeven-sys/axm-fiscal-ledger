@@ -1,18 +1,16 @@
-import { withAuth } from 'next-auth/middleware';
+import { type NextRequest } from 'next/server';
+import { updateSession } from '@/lib/supabase/middleware';
 
 /**
- * NextAuth Middleware - Protects routes requiring authentication
+ * Supabase Auth Middleware - Protects routes requiring authentication
  * 
- * Routes matching these patterns will require a valid session:
- * - / (root - main app)
- * - /api (except auth endpoints)
+ * Refreshes the Supabase auth session on every request and redirects
+ * unauthenticated users to /signin.
  */
 
-export default withAuth({
-  pages: {
-    signIn: '/signin',
-  },
-});
+export async function middleware(request: NextRequest) {
+  return await updateSession(request);
+}
 
 export const config = {
   // Protect all routes except static files, auth, signin, and public assets
